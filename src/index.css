@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+  background-color: #000000;
+  color: #FFFFFF;
+}
+
+/* Basic focus outline consistent with subtle borders */
+*:focus-visible {
+  outline: 1px solid #3A3A3A;
+  outline-offset: 2px;
+}
+
+
+
+/* Subtle ripple for map markers (kept minimal and low-noise) */
+@keyframes map-ripple {
+  from {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.35;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(3.2);
+    opacity: 0;
+  }
+}
+
+.map-ripple {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 9999px;
+  animation: map-ripple 2.8s ease-out infinite;
+  pointer-events: none;
+}
+
+.map-ripple.delayed {
+  animation-delay: 1.4s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-ripple { animation: none; display: none; }
+}

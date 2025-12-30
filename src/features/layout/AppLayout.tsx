@@ -1,7 +1,7 @@
 import { Outlet } from 'react-router'
 import Sidebar from './Sidebar'
 import { useEffect, useState } from 'react'
-import { FiClock, FiAlertTriangle } from 'react-icons/fi'
+import { FiClock, FiAlertTriangle, FiMenu } from 'react-icons/fi'
 import { triggerAlarm } from '../common/alarm'
 import { ConfirmDialog } from '../common/Modal'
 import moment from 'moment'
@@ -11,6 +11,7 @@ export default function AppLayout() {
   const [alarmLoading, setAlarmLoading] = useState(false)
   const [alarmMsg, setAlarmMsg] = useState<string | null>(null)
   const [alarmOpen, setAlarmOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const onAlarm = () => setAlarmOpen(true)
   const confirmAlarm = async () => {
     setAlarmLoading(true)
@@ -31,10 +32,13 @@ export default function AppLayout() {
   }, [])
   return (
     <div className="min-h-screen h-full w-full bg-black text-white">
-      <Sidebar />
-      <div className="ml-[240px] min-h-screen flex flex-col">
-        <header className="fixed top-0 left-[240px] right-0 h-12 border-b border-[#2A2A2A] flex items-center justify-between px-4 bg-black z-10">
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="md:ml-[240px] min-h-screen flex flex-col">
+        <header className="fixed top-0 left-0 md:left-[240px] right-0 h-12 border-b border-[#2A2A2A] flex items-center justify-between px-4 bg-black z-10">
           <div className="flex items-center gap-2">
+            <button className="md:hidden text-[#B3B3B3] hover:text-white" aria-label="Open navigation" onClick={() => setSidebarOpen(true)}>
+              <FiMenu />
+            </button>
             <button
               onClick={onAlarm}
               disabled={alarmLoading}

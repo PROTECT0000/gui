@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router'
-import { getMiner } from './api'
+import { getMiner, getMinerProfileImage } from './api'
 import type { Miner } from './types'
 import moment from 'moment'
 import { ConfirmDialog } from '../common/Modal'
 import { FiPhone, FiAlertTriangle } from 'react-icons/fi'
 import DummyMap from '../map/DummyMap'
+import { getMapBackground } from '../map/api'
 import { getMinerSeries } from '../telemetry/api'
 import type { MinerSeriesPoint } from '../telemetry/types'
 import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip as RTooltip } from 'recharts'
@@ -33,6 +34,8 @@ export default function MinerDetailPage() {
   const [telemetryLoading, setTelemetryLoading] = useState<boolean>(false)
   const [callOpen, setCallOpen] = useState(false)
   const [emergencyOpen, setEmergencyOpen] = useState(false)
+  const [profileUrl, setProfileUrl] = useState<string | null>(null)
+  const [backgroundUrl, setBackgroundUrl] = useState<string | undefined>(undefined)
   const onCall = () => setCallOpen(true)
   const onEmergency = () => setEmergencyOpen(true)
 
@@ -62,6 +65,25 @@ export default function MinerDetailPage() {
     return () => { mounted = false }
   }, [minerId])
 
+  // Fetch profile image (optional)
+  useEffect(() => {
+    let mounted = true
+    if (!minerId) return
+    getMinerProfileImage(minerId)
+      .then((d) => { if (mounted) setProfileUrl(d.url) })
+      .catch(() => { if (mounted) setProfileUrl(null) })
+    return () => { mounted = false }
+  }, [minerId])
+
+  // Fetch pit/map background image (optional)
+  useEffect(() => {
+    let mounted = true
+    getMapBackground()
+      .then((d) => { if (mounted && d?.url) setBackgroundUrl(d.url) })
+      .catch(() => {})
+    return () => { mounted = false }
+  }, [])
+
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
@@ -90,10 +112,21 @@ export default function MinerDetailPage() {
         {miner && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-0.5">
+              <div className="mb-3 flex items-center gap-3">
+                {profileUrl ? (
+                  <img src={profileUrl} alt={`${miner.name} profile`} className="w-16 h-16 rounded-full border border-[#2A2A2A] object-cover bg-black/50" draggable={false} />
+                ) : (
+                  <div className="w-16 h-16 rounded-full border border-[#2A2A2A] bg-black/50 flex items-center justify-center text-sm text-[#B3B3B3] select-none">
+                    {miner.name?.[0] || 'M'}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <div className="text-lg font-semibold truncate">{miner.name}</div>
+                  <div className="text-xs text-[#B3B3B3] truncate">{miner.team || '—'}</div>
+                </div>
+              </div>
               <Field label="ID" value={miner.minerId} />
-              <Field label="Name" value={miner.name} />
               <Field label="Device" value={miner.deviceSerial} />
-              <Field label="Team" value={miner.team || '—'} />
               <Field label="Status" value={<StatusPill status={miner.deviceStatus} />} />
               <Field label="Last seen" value={miner.lastSeen ? moment(miner.lastSeen).format('YYYY-MM-DD HH:mm:ss') : '—'} />
               <Field label="Heat index" value={miner.lastHeatIndexC != null ? `${miner.lastHeatIndexC.toFixed(1)}°C` : '—'} />
@@ -105,11 +138,16 @@ export default function MinerDetailPage() {
               <Field label="Altitude" value={miner.lastKnownLocation?.altitudeM != null ? `${miner.lastKnownLocation.altitudeM} m` : '—'} />
             </div>
             <div>
-              <div className="text-xs text-[#B3B3B3] mb-2">Last known location</div>
-              <div className="h-64">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-xs text-[#B3B3B3]">Last known location</div>
+                <Link to="/map" className="text-xs text-[#B3B3B3] hover:text-white border border-[#2A2A2A] rounded-[6px] px-2 py-1">View Map</Link>
+              </div>
+              <div className="h-120">
                 {miner.lastKnownLocation ? (
                   <DummyMap
                     points={[{ id: miner.minerId, name: miner.name, status: miner.deviceStatus, lat: miner.lastKnownLocation.lat, lng: miner.lastKnownLocation.lng }]}
+                    backgroundImageUrl={backgroundUrl}
+                    showGrid
                     height="100%"
                   />
                 ) : (

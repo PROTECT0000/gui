@@ -25,3 +25,7 @@ export interface MinerCreate {
   deviceSerial: string
   team?: string | null
 }
+
+export interface MinerProfileImage {
+  url: string
+}

@@ -10,6 +10,7 @@ import LogsPage from './features/logs/LogsPage'
 import CctvsPage from './features/cctv/CctvsPage'
 import { Protected } from './features/common/Protected'
 import AppLayout from './features/layout/AppLayout'
+import MapPage from './features/map/MapPage'
 
 const router = createBrowserRouter([
   { path: '/', element: <LoginPage/> },
@@ -17,6 +18,7 @@ const router = createBrowserRouter([
     element: <Protected><AppLayout/></Protected>,
     children: [
       { path: '/dashboard', element: <DashboardPage/> },
+      { path: '/map', element: <MapPage/> },
       { path: '/miners', element: <MinersPage/> },
       { path: '/miners/:minerId', element: <MinerDetailPage/> },
       { path: '/alerts', element: <AlertsPage/> },

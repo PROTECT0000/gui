@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useCursorPager } from '../common/useCursorPager'
 import { listMiners, createMiner } from './api'
 import type { Miner } from './types'
@@ -10,7 +10,6 @@ import Section from '../common/Section'
 import TableHeaderCell from '../common/TableHeaderCell'
 import { StatusPill, ZonePill } from '../common/Pills'
 import Modal from '../common/Modal'
-import PaginationFooter from '../common/PaginationFooter'
 
 function formatDate(s?: string | null) {
   if (!s) return '—'
@@ -20,7 +19,16 @@ function formatDate(s?: string | null) {
 
 export default function MinersPage() {
   const [status, setStatus] = useState<'all' | 'online' | 'offline'>('all')
-  const pager = useCursorPager<Miner>(async (cursor) => listMiners({ cursor, pageSize: 50, status: status === 'all' ? undefined : status }))
+  const [q, setQ] = useState('')
+  const [debouncedQ, setDebouncedQ] = useState('')
+  const pager = useCursorPager<Miner>(async (cursor) => listMiners({ cursor, pageSize: 20, status: status === 'all' ? undefined : status, q: debouncedQ || undefined }))
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQ(q.trim()), 300)
+    return () => clearTimeout(id)
+  }, [q])
+  useEffect(() => {
+    pager.reset()
+  }, [status, debouncedQ])
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -46,6 +54,14 @@ export default function MinersPage() {
     <div className="p-4">
       <Section title={<><FiUsers className="text-[#B3B3B3]"/> Miners</>} action={
         <div className="flex items-center gap-2">
+          <div className="hidden md:block">
+            <input
+              value={q}
+              onChange={(e)=>setQ(e.target.value)}
+              placeholder="Search miners…"
+              className="bg-black text-[#B3B3B3] border border-[#2A2A2A] rounded-[6px] px-2 py-1 text-sm w-[220px]"
+            />
+          </div>
           <select value={status} onChange={(e)=>{ setStatus(e.target.value as any); pager.reset() }} className="bg-black text-[#B3B3B3] border border-[#2A2A2A] rounded-[6px] px-2 py-1 text-sm">
             <option value="all">All</option>
             <option value="online">Online</option>
@@ -54,6 +70,15 @@ export default function MinersPage() {
           <button onClick={()=>setOpen(true)} className="text-xs text-[#B3B3B3] hover:text-white border border-[#2A2A2A] rounded-[6px] px-2 py-1">Add miner</button>
         </div>
       }>
+        {/* Mobile search row */}
+        <div className="md:hidden mb-3">
+          <input
+            value={q}
+            onChange={(e)=>setQ(e.target.value)}
+            placeholder="Search miners…"
+            className="w-full bg-black text-[#B3B3B3] border border-[#2A2A2A] rounded-[6px] px-2 py-2 text-sm"
+          />
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[900px]">
             <thead className="text-[#B3B3B3]">
@@ -75,24 +100,29 @@ export default function MinersPage() {
             <tbody>
               {pager.items.map((m) => (
                 <tr key={m.minerId} className="border-b border-[#2A2A2A]">
-                  <td className="py-2 whitespace-nowrap"><Link to={`/miners/${encodeURIComponent(m.minerId)}`} className="hover:underline text-white">{m.name}</Link></td>
-                  <td className="py-2 text-[#B3B3B3] whitespace-nowrap">{m.deviceSerial}</td>
-                  <td className="py-2 text-[#B3B3B3] whitespace-nowrap">{m.team || '—'}</td>
-                  <td className="py-2 text-[#B3B3B3] whitespace-nowrap">{m.lastHeatIndexC != null ? `${m.lastHeatIndexC.toFixed(1)}°C` : '—'}</td>
-                  <td className="py-2 text-[#B3B3B3] whitespace-nowrap">{m.lastBodyTemp != null ? `${m.lastBodyTemp.toFixed(1)}°C` : '—'}</td>
-                  <td className="py-2 text-[#B3B3B3] whitespace-nowrap">{m.lastBatteryPct != null ? `${m.lastBatteryPct}%` : '—'}</td>
-                  <td className="py-2 text-[#B3B3B3] whitespace-nowrap">{m.lastSignalRssi != null ? `${m.lastSignalRssi} dBm` : '—'}</td>
-                  <td className="py-2 text-[#B3B3B3] whitespace-nowrap">{m.lastKnownLocation ? `${m.lastKnownLocation.lat.toFixed(3)}, ${m.lastKnownLocation.lng.toFixed(3)}` : '—'}</td>
-                  <td className="py-2 text-[#B3B3B3] whitespace-nowrap">{m.lastKnownLocation?.altitudeM != null ? `${m.lastKnownLocation.altitudeM} m` : '—'}</td>
-                  <td className="py-2 whitespace-nowrap"><ZonePill zone={m.zone ?? null} withIcon /></td>
-                  <td className="py-2 whitespace-nowrap"><StatusPill status={m.deviceStatus} /></td>
-                  <td className="py-2 text-[#B3B3B3] whitespace-nowrap">{formatDate(m.lastSeen)}</td>
+                  <td className="py-2 px-2 whitespace-nowrap"><Link to={`/miners/${encodeURIComponent(m.minerId)}`} className="hover:underline text-white">{m.name}</Link></td>
+                  <td className="py-2 px-2 text-[#B3B3B3] whitespace-nowrap">{m.deviceSerial}</td>
+                  <td className="py-2 px-2 text-[#B3B3B3] whitespace-nowrap">{m.team || '—'}</td>
+                  <td className="py-2 px-2 text-[#B3B3B3] whitespace-nowrap">{m.lastHeatIndexC != null ? `${m.lastHeatIndexC.toFixed(1)}°C` : '—'}</td>
+                  <td className="py-2 px-2 text-[#B3B3B3] whitespace-nowrap">{m.lastBodyTemp != null ? `${m.lastBodyTemp.toFixed(1)}°C` : '—'}</td>
+                  <td className="py-2 px-2 text-[#B3B3B3] whitespace-nowrap">{m.lastBatteryPct != null ? `${m.lastBatteryPct}%` : '—'}</td>
+                  <td className="py-2 px-2 text-[#B3B3B3] whitespace-nowrap">{m.lastSignalRssi != null ? `${m.lastSignalRssi} dBm` : '—'}</td>
+                  <td className="py-2 px-2 text-[#B3B3B3] whitespace-nowrap">{m.lastKnownLocation ? `${m.lastKnownLocation.lat.toFixed(3)}, ${m.lastKnownLocation.lng.toFixed(3)}` : '—'}</td>
+                  <td className="py-2 px-2 text-[#B3B3B3] whitespace-nowrap">{m.lastKnownLocation?.altitudeM != null ? `${m.lastKnownLocation.altitudeM} m` : '—'}</td>
+                  <td className="py-2 px-2 whitespace-nowrap"><ZonePill zone={m.zone ?? null} withIcon /></td>
+                  <td className="py-2 px-2 whitespace-nowrap"><StatusPill status={m.deviceStatus} /></td>
+                  <td className="py-2 px-2 text-[#B3B3B3] whitespace-nowrap">{formatDate(m.lastSeen)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <PaginationFooter loading={pager.loading} hasMore={pager.hasMore} error={pager.error} onLoadMore={()=>pager.loadMore()} />
+        <div className="mt-3 flex items-center gap-3">
+          {pager.error && <div className="text-red-400 text-sm">{pager.error}</div>}
+          <button disabled={!pager.hasMore || pager.loading} onClick={()=>pager.loadMore()} className="border border-[#2A2A2A] rounded-[6px] px-3 py-1 text-sm text-[#B3B3B3] hover:text-white disabled:opacity-60">
+            {pager.loading ? 'Loading…' : pager.hasMore ? 'Load more' : 'No more'}
+          </button>
+        </div>
       </Section>
       <Modal
         open={open}

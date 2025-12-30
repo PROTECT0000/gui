@@ -10,11 +10,34 @@ import type { StatsOverview, OnlinePoint, AvgBodyTemp } from '../stats/types'
 import { getWeather, getWeatherForecast, getWeatherSeries } from '../weather/api'
 import type { Weather, WeatherForecastItem, WeatherSeriesPoint } from '../weather/types'
 import { Tooltip as RTooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, Cell } from 'recharts'
-import { FiBarChart2, FiUsers, FiMap, FiAlertTriangle, FiUser, FiCpu, FiMapPin, FiClock, FiActivity, FiCloud, FiWind, FiDroplet, FiSun, FiThermometer, FiBattery, FiGrid, FiWifi, FiTrendingUp } from 'react-icons/fi'
+import {
+    FiBarChart2,
+    FiUsers,
+    FiMap,
+    FiAlertTriangle,
+    FiUser,
+    FiCpu,
+    FiMapPin,
+    FiClock,
+    FiActivity,
+    FiCloud,
+    FiWind,
+    FiDroplet,
+    FiSun,
+    FiThermometer,
+    FiBattery,
+    FiGrid,
+    FiWifi,
+    FiTrendingUp,
+    FiArrowRight
+} from 'react-icons/fi'
 import { Link } from 'react-router'
 import moment from 'moment'
 
 import DummyMap from '../map/DummyMap'
+import { getMapBackground } from '../map/api'
+import { listMinerPositions } from '../map/api'
+import type { MinerPosition } from '../map/types'
 import { StatusPill, ZonePill } from '../common/Pills'
 import Section from '../common/Section'
 import TableHeaderCell from '../common/TableHeaderCell'
@@ -54,6 +77,10 @@ export default function DashboardPage() {
   const [avgTemp, setAvgTemp] = useState<AvgBodyTemp | null>(null)
   const [avgTempError, setAvgTempError] = useState<string | null>(null)
   const [avgTempLoading, setAvgTempLoading] = useState<boolean>(false)
+  const [positions, setPositions] = useState<MinerPosition[] | null>(null)
+  const [positionsError, setPositionsError] = useState<string | null>(null)
+  const [positionsLoading, setPositionsLoading] = useState<boolean>(false)
+  const [backgroundUrl, setBackgroundUrl] = useState<string | undefined>(undefined)
 
   // Fetch overview stats
   useMemo(() => {
@@ -104,6 +131,27 @@ export default function DashboardPage() {
       .then((d) => { if (mounted) setTempSeries(d.items) })
       .catch((e) => { if (mounted) setTempSeriesError(e?.response?.data?.message || 'Failed to load temperature series') })
       .finally(() => { if (mounted) setTempSeriesLoading(false) })
+    return () => { mounted = false }
+  }, [])
+
+  // Fetch all miner positions (no pagination) for map
+  useMemo(() => {
+    let mounted = true
+    setPositionsLoading(true)
+    setPositionsError(null)
+    listMinerPositions()
+      .then((d) => { if (mounted) setPositions(d.items) })
+      .catch((e) => { if (mounted) setPositionsError(e?.response?.data?.message || 'Failed to load positions') })
+      .finally(() => { if (mounted) setPositionsLoading(false) })
+    return () => { mounted = false }
+  }, [])
+
+  // Fetch background image for map (no controls on dashboard)
+  useMemo(() => {
+    let mounted = true
+    getMapBackground()
+      .then((d) => { if (mounted && d?.url) setBackgroundUrl(d.url) })
+      .catch(() => {})
     return () => { mounted = false }
   }, [])
 
@@ -203,20 +251,37 @@ export default function DashboardPage() {
           </Section>
         </div>
         <div className="h-116">
-        <Section title={<><FiMap className="text-[#B3B3B3]"/> Map</>} fill>
-            <DummyMap
-              points={minersPager.items
-                .filter(m => !!m.lastKnownLocation)
-                .map(m => ({
-                  id: m.minerId,
-                  name: m.name,
-                  status: m.deviceStatus,
-                  lat: m.lastKnownLocation!.lat,
-                  lng: m.lastKnownLocation!.lng,
-                }))}
-              height="100%"
-            />
-           </Section>
+        <Section title={<><FiMap className="text-[#B3B3B3]"/> Map</>} fill
+          action={
+            <div className="flex items-center gap-2">
+              {positionsLoading && <span className="text-xs text-[#B3B3B3]">Loading…</span>}
+              <Link
+                to="/map"
+                className="text-xs text-[#B3B3B3] hover:text-white border border-[#2A2A2A] rounded-[6px] px-2 py-1 flex gap-0.5 items-center"
+              >
+                View Map<FiArrowRight/>
+              </Link>
+            </div>
+          }
+        >
+          {positionsError && <div className="text-sm text-red-400 mb-2">{positionsError}</div>}
+          <DummyMap
+            points={(positions || [])
+              .filter(m => !!m.lastKnownLocation)
+              .map(m => ({
+                id: m.minerId,
+                name: m.name,
+                status: m.deviceStatus,
+                lat: m.lastKnownLocation!.lat,
+                lng: m.lastKnownLocation!.lng,
+              }))}
+            draggable
+            finite
+            backgroundImageUrl={backgroundUrl}
+            showGrid
+            height="100%"
+          />
+        </Section>
         </div>
         <div className="h-116">
           <Section title={<><FiAlertTriangle className="text-[#B3B3B3]"/> Open Alerts</>} fill>
@@ -293,18 +358,18 @@ export default function DashboardPage() {
                 <tbody>
                   {minersPager.items.map((m) => (
                     <tr key={m.minerId} className="border-b border-[#2A2A2A]">
-                      <td className="py-2 whitespace-nowrap"><Link to={`/miners/${encodeURIComponent(m.minerId)}`} className="hover:underline text-white">{m.name}</Link></td>
-                      <td className="py-2 text-[#B3B3B3] whitespace-nowrap">{m.deviceSerial}</td>
-                      <td className="py-2 text-[#B3B3B3] whitespace-nowrap">{m.team || '—'}</td>
-                      <td className="py-2 text-[#B3B3B3] whitespace-nowrap">{m.lastHeatIndexC != null ? `${m.lastHeatIndexC.toFixed(1)}°C` : '—'}</td>
-                      <td className="py-2 text-[#B3B3B3] whitespace-nowrap">{m.lastBodyTemp != null ? `${m.lastBodyTemp.toFixed(1)}°C` : '—'}</td>
-                      <td className="py-2 text-[#B3B3B3] whitespace-nowrap">{m.lastBatteryPct != null ? `${m.lastBatteryPct}%` : '—'}</td>
-                      <td className="py-2 text-[#B3B3B3] whitespace-nowrap">{m.lastSignalRssi != null ? `${m.lastSignalRssi} dBm` : '—'}</td>
-                      <td className="py-2 text-[#B3B3B3] whitespace-nowrap">{m.lastKnownLocation ? `${m.lastKnownLocation.lat.toFixed(3)}, ${m.lastKnownLocation.lng.toFixed(3)}` : '—'}</td>
-                      <td className="py-2 text-[#B3B3B3] whitespace-nowrap">{m.lastKnownLocation?.altitudeM != null ? `${m.lastKnownLocation.altitudeM} m` : '—'}</td>
-                      <td className="py-2 whitespace-nowrap"><ZonePill zone={m.zone ?? null} /></td>
-                      <td className="py-2 whitespace-nowrap"><StatusPill status={m.deviceStatus} /></td>
-                      <td className="py-2 text-[#B3B3B3] whitespace-nowrap">{formatDate(m.lastSeen)}</td>
+                      <td className="py-2 px-2 whitespace-nowrap"><Link to={`/miners/${encodeURIComponent(m.minerId)}`} className="hover:underline text-white">{m.name}</Link></td>
+                      <td className="py-2 px-2 text-[#B3B3B3] whitespace-nowrap">{m.deviceSerial}</td>
+                      <td className="py-2 px-2 text-[#B3B3B3] whitespace-nowrap">{m.team || '—'}</td>
+                      <td className="py-2 px-2 text-[#B3B3B3] whitespace-nowrap">{m.lastHeatIndexC != null ? `${m.lastHeatIndexC.toFixed(1)}°C` : '—'}</td>
+                      <td className="py-2 px-2 text-[#B3B3B3] whitespace-nowrap">{m.lastBodyTemp != null ? `${m.lastBodyTemp.toFixed(1)}°C` : '—'}</td>
+                      <td className="py-2 px-2 text-[#B3B3B3] whitespace-nowrap">{m.lastBatteryPct != null ? `${m.lastBatteryPct}%` : '—'}</td>
+                      <td className="py-2 px-2 text-[#B3B3B3] whitespace-nowrap">{m.lastSignalRssi != null ? `${m.lastSignalRssi} dBm` : '—'}</td>
+                      <td className="py-2 px-2 text-[#B3B3B3] whitespace-nowrap">{m.lastKnownLocation ? `${m.lastKnownLocation.lat.toFixed(3)}, ${m.lastKnownLocation.lng.toFixed(3)}` : '—'}</td>
+                      <td className="py-2 px-2 text-[#B3B3B3] whitespace-nowrap">{m.lastKnownLocation?.altitudeM != null ? `${m.lastKnownLocation.altitudeM} m` : '—'}</td>
+                      <td className="py-2 px-2 whitespace-nowrap"><ZonePill zone={m.zone ?? null} /></td>
+                      <td className="py-2 px-2 whitespace-nowrap"><StatusPill status={m.deviceStatus} /></td>
+                      <td className="py-2 px-2 text-[#B3B3B3] whitespace-nowrap">{formatDate(m.lastSeen)}</td>
                     </tr>
                   ))}
                 </tbody>

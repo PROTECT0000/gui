@@ -126,6 +126,48 @@ export function DummyMap({
     lastPos.current = null
   }
 
+  const clampWheel = (nx: number, ny: number) => {
+    if (!finite) return { x: nx, y: ny }
+    const w = containerRef.current?.clientWidth || 0
+    const h = containerRef.current?.clientHeight || 0
+    const extraX = ((worldScale - 1) * w) / 2
+    const extraY = ((worldScale - 1) * h) / 2
+    const baseX = panLimitPx != null ? panLimitPx : (extraX > 0 ? extraX : w * 0.5)
+    const baseY = panLimitPx != null ? panLimitPx : (extraY > 0 ? extraY : h * 0.5)
+    const limX = baseX * Math.max(zoom, 1)
+    const limY = baseY * Math.max(zoom, 1)
+    return {
+      x: Math.max(-limX, Math.min(limX, nx)),
+      y: Math.max(-limY, Math.min(limY, ny)),
+    }
+  }
+
+  const onWheel = (e: React.WheelEvent) => {
+    if (!draggable) return
+    e.preventDefault()
+    const dx = e.deltaX
+    const dy = e.deltaY
+    // Invert wheel pan for natural-feel
+    setOffset((o) => clampWheel(o.x - dx, o.y - dy))
+  }
+
+  // Ensure wheel is non-passive to reliably prevent page scroll
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el || !draggable) return
+    const handler = (ev: WheelEvent) => {
+      ev.preventDefault()
+      const dx = ev.deltaX
+      const dy = ev.deltaY
+      // Invert wheel pan for natural-feel
+      setOffset((o) => clampWheel(o.x - dx, o.y - dy))
+    }
+    el.addEventListener('wheel', handler, { passive: false })
+    return () => {
+      el.removeEventListener('wheel', handler as EventListener)
+    }
+  }, [draggable, finite, panLimitPx, zoom])
+
   const gridSize = gridSizePx
   const bgX = ((offset.x % gridSize) + gridSize) % gridSize
   const bgY = ((offset.y % gridSize) + gridSize) % gridSize
@@ -165,7 +207,7 @@ export function DummyMap({
     <div
       ref={containerRef}
       className="relative w-full border border-[#2A2A2A] rounded-[8px] bg-black select-none overflow-hidden"
-      style={{ height, cursor: draggable ? (dragging ? 'grabbing' : 'grab') : 'default' }}
+      style={{ height, cursor: draggable ? (dragging ? 'grabbing' : 'grab') : 'default', overscrollBehavior: 'contain', touchAction: 'none' }}
       onMouseDown={onDown as any}
       onMouseMove={onMove as any}
       onMouseUp={endDrag}
@@ -173,6 +215,8 @@ export function DummyMap({
       onTouchStart={onDown as any}
       onTouchMove={onMove as any}
       onTouchEnd={endDrag}
+      onWheel={onWheel}
+      onWheelCapture={onWheel}
     >
       {showGrid && (
         <div

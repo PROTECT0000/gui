@@ -1,4 +1,3 @@
-import React from 'react'
 import { FiGrid } from 'react-icons/fi'
 
 export function StatusPill({ status }: { status: 'online' | 'offline' }) {
